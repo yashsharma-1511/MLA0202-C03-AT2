@@ -1,0 +1,103 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA, FactorAnalysis, FastICA
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import silhouette_score
+
+data = {
+    "Alcohol": [14.2, 13.20, 13.16, 13.37, 13.24, 14.20, 14.39, 14.06, 13.84, 13.86],
+    "MalicAcid": [1.71, 1.78, 2.36, 1.95, 2.59, 1.76, 1.87, 2.15, 1.64, 1.35],
+    "Ash": [2.43, 2.14, 2.67, 2.50, 2.87, 2.45, 2.45, 2.61, 2.17, 2.27],
+    "Alcalinity": [15.6, 11.2, 18.6, 16.8, 21.0, 15.2, 14.6, 17.6, 14.0, 16.0],
+    "Magnesium": [127, 100, 101, 113, 118, 112, 96, 121, 97, 98],
+    "Phenols": [2.80, 2.65, 2.80, 3.85, 2.80, 3.27, 2.50, 2.60, 2.80, 2.98]
+}
+
+df = pd.DataFrame(data)
+
+X = df.values
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+
+fa = FactorAnalysis(n_components=2, random_state=42)
+X_fa = fa.fit_transform(X_scaled)
+
+ica = FastICA(n_components=2, random_state=42, max_iter=1000)
+X_ica = ica.fit_transform(X_scaled)
+
+def gmm_cluster(X):
+    best_score = -1
+    best_model = None
+    best_labels = None
+    best_k = None
+
+    for k in range(2, 5):
+        model = GaussianMixture(
+            n_components=k,
+            random_state=42,
+            covariance_type="full"
+        )
+        labels = model.fit_predict(X)
+
+        score = silhouette_score(X, labels)
+
+        if score > best_score:
+            best_score = score
+            best_model = model
+            best_labels = labels
+            best_k = k
+
+    return best_k, best_labels, best_score
+
+k_pca, labels_pca, score_pca = gmm_cluster(X_pca)
+k_fa, labels_fa, score_fa = gmm_cluster(X_fa)
+k_ica, labels_ica, score_ica = gmm_cluster(X_ica)
+
+print("PCA Results")
+print("Clusters:", k_pca)
+print("Silhouette Score:", score_pca)
+print("Labels:", labels_pca)
+
+print("\nFactor Analysis Results")
+print("Clusters:", k_fa)
+print("Silhouette Score:", score_fa)
+print("Labels:", labels_fa)
+
+print("\nICA Results")
+print("Clusters:", k_ica)
+print("Silhouette Score:", score_ica)
+print("Labels:", labels_ica)
+
+comparison = pd.DataFrame({
+    "Method": ["PCA", "Factor Analysis", "ICA"],
+    "Clusters": [k_pca, k_fa, k_ica],
+    "Silhouette Score": [score_pca, score_fa, score_ica]
+})
+
+print("\nComparison:")
+print(comparison)
+
+fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+
+axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=labels_pca, s=100)
+axes[0].set_title("PCA + GMM")
+axes[0].set_xlabel("Component 1")
+axes[0].set_ylabel("Component 2")
+
+axes[1].scatter(X_fa[:, 0], X_fa[:, 1], c=labels_fa, s=100)
+axes[1].set_title("Factor Analysis + GMM")
+axes[1].set_xlabel("Factor 1")
+axes[1].set_ylabel("Factor 2")
+
+axes[2].scatter(X_ica[:, 0], X_ica[:, 1], c=labels_ica, s=100)
+axes[2].set_title("ICA + GMM")
+axes[2].set_xlabel("Component 1")
+axes[2].set_ylabel("Component 2")
+
+plt.tight_layout()
+plt.show()
